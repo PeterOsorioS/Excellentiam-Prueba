@@ -1,0 +1,219 @@
+﻿@page "/"
+@using Excellentiam.Components.Tareas
+@using Excellentiam.DTOs
+@using Excellentiam.Service.Interface
+@using Excellentiam.Shared
+@using Microsoft.AspNetCore.Components.Authorization
+@inject CustomAuthenticationStateProvider AuthStateProvider
+@inject ITareaService TareaService;
+@inject NavigationManager NavigationManager
+
+<PageTitle>Tareas</PageTitle>
+
+<div>
+    <h1 class="fw-bold text-center">Gestor de Tareas</h1>
+    <div>
+        <p class="mb-5 text-center">Bienvenido al gestor de tareas. Aquí puedes ver y administrar tus tareas pendientes.</p>
+    </div>
+</div>
+<div class="card mx-auto rounded bg-white shadow-lg" style="max-width:1200px">
+    <div class="d-flex card-header justify-content-between align-items-center px-lg-5">
+        <h2 class="card-title fw-bold">Mis Tareas</h2>
+        <div class="d-flex align-items-center flex-column flex-lg-row gap-2">
+            <select id="filterStatus" 
+                    @bind="estadoFiltro"  
+                    class="form-select me-2" 
+                    style="width: 180px;">
+                <option value="Todo">Todas</option>
+                <option value="Pendiente">Pendiente</option>
+                <option value="EnProgreso">En Proceso</option> 
+                <option value="Completada">Completada</option>
+            </select>
+            <button type="button" class="btn btn-dark" @onclick="AbrirModalRegistro">
+                Añadir Tarea
+            </button>
+        </div>
+    </div>
+    <div class="card-body">
+        @if (cargando)
+        {
+            <div class="fs-5 py-5 text-center">
+                <span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span>
+                <span>Cargando tareas...</span>
+            </div>
+        }
+        else if (tareas == null || !tareas.Any())
+        {
+            <div class="fs-5 py-5 text-center">
+                <span>No se encuentran tareas registradas.</span>
+            </div>
+        }
+        else
+        {
+            <div class="task-list-container mt-3">
+                <ul class="task-list row g-4 m-0 overflow-auto p-0" style="max-height: 450px;">
+                    @foreach (var tarea in tareasFiltradas)
+                    {
+                        <li class="col-12 col-md-6 col-lg-4 col-xl-3 task-item mx-1">
+                            <div class="w-100 rounded-3 shadow-sm">
+                                <div class="card-header border-0 pb-2">
+                                    <h5 class="card-title fw-bold text-dark mb-0">@tarea.Titulo</h5>
+                                </div>
+                                <div class="card-body pt-0">
+                                    <p class="card-text text-secondary small mb-2 line-clamp-2">
+                                        @tarea.Descripcion
+                                    </p>
+                                    <div class="d-flex flex-column align-items-start small gap-2">
+                                        <span class="task-status rounded-pill text-uppercase fw-semibold @EstiloEstado(tarea.Estado) px-3 py-1">
+                                            @tarea.Estado
+                                        </span>
+                                        <small class="text-muted">@tarea.FechaCreacion.ToString("d")</small>
+                                    </div>
+                                </div>
+                                <div class="card-footer d-flex justify-content-end gap-2 border-0 bg-white pt-0">
+                                    <button type="button" @onclick="() => AbrirModalModificar(tarea.Id)" class="btn btn-outline-dark btn-sm d-flex align-items-center">
+                                        <i class="bi bi-pencil me-2"></i> Modificar
+                                    </button>
+                                    <button type="button" class="btn btn-danger btn-sm d-flex align-items-center">
+                                        <i class="bi bi-trash me-2"></i> Eliminar Tarea
+                                    </button>
+                                </div>
+                            </div>
+                        </li>
+                    }
+                </ul>
+            </div>
+        }
+    </div>
+</div>
+
+
+<ModalComponent Titulo="Añadir Nueva Tarea" @ref="modalRegistro" >
+    <Body>
+        <RegistrarTarea Finalizado="FinalizarRegistro" Cerrar="modalRegistro.Hide" />
+    </Body>
+</ModalComponent>
+
+<ModalComponent Titulo="Modificar Tarea" @ref="modalModificar">
+    <Body>
+        <ModificarTarea Finalizado="FinalizarRegistro" TareaId="TareaSeleccionada"  Cerrar="modalModificar.Hide" />
+    </Body>
+</ModalComponent>
+
+@code{
+    private IEnumerable<TareaDTO> tareas = Enumerable.Empty<TareaDTO>();
+    private IEnumerable<TareaDTO> tareasFiltradas = Enumerable.Empty<TareaDTO>();
+
+    private ModalComponent? modalRegistro;
+    private ModalComponent? modalModificar;
+    private ModificarTarea? modificarTarea;
+
+    private int TareaSeleccionada = 0;
+    private bool cargando = false;
+    private string _estadoFiltro = "Todo";
+
+    private string estadoFiltro
+    {
+        get => _estadoFiltro;
+        set
+        {
+            if (_estadoFiltro != value)
+            {
+                _estadoFiltro = value;
+                AplicarFiltro(); 
+            }
+        }
+    }
+
+
+    protected override async Task OnInitializedAsync()
+    {
+        cargando = true;
+        await Autenticacion();
+        try
+        {
+            var tiempoMinimo = Task.Delay(1500);
+            var consultaTask = ObtenerTareas();
+            await Task.WhenAll(tiempoMinimo, consultaTask);
+            AplicarFiltro();
+        }
+        catch (Exception ex)
+        {
+            tareas = Enumerable.Empty<TareaDTO>();
+        }
+        finally
+        {
+            cargando = false;
+        }
+    }
+
+    private async Task ObtenerTareas()
+    {
+        var usuario = await AuthStateProvider.UsuarioData();
+        tareas = await TareaService.ObtenerTareas(usuario.Id);
+        StateHasChanged();   
+    }
+
+    private void AplicarFiltro()
+    {
+        if(estadoFiltro == "Todo")
+        {
+            tareasFiltradas = tareas;
+        }
+        else
+        {
+            tareasFiltradas = tareas.Where(t => t.Estado == estadoFiltro).ToList();
+        }
+        StateHasChanged();
+    }
+
+    private void CerrarModalRegistro()
+    {
+        modalRegistro.Hide();
+    }
+
+    private void AbrirModalRegistro()
+    {
+        modalRegistro.Show();
+    }
+
+    private void CerrarModalModificar()
+    {
+        modalModificar.Hide();
+    }
+
+    private void AbrirModalModificar(int id)
+    {
+        TareaSeleccionada = id;
+        modalModificar.Show();
+    }
+
+    private string EstiloEstado(string estado)
+    {
+        return estado switch
+        {
+            "Pendiente" => "bg-pendiente",
+            "Proceso" => "bg-en-proceso",
+            "Completado" => "bg-completada",
+            _ => "bg-secondary"
+        };
+    }
+
+    private async Task FinalizarRegistro()
+    {
+        modalRegistro.Hide();
+        await ObtenerTareas();
+        AplicarFiltro();
+
+    }
+
+    private async Task Autenticacion()
+    {
+        var auth = await AuthStateProvider.GetAuthenticationStateAsync();
+        if(!auth.User.Identity.IsAuthenticated)
+        {
+            NavigationManager.NavigateTo("/login");
+        }
+    }
+
+ }

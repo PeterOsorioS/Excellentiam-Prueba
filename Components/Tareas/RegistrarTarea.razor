@@ -1,0 +1,56 @@
+﻿@using Excellentiam.DTOs
+@using Excellentiam.Service.Interface
+@inject ITareaService TareaService
+
+<EditForm Model="tarea" OnValidSubmit="GuardarTarea" >
+    <DataAnnotationsValidator />
+    <div class="mb-2">
+        <div class="d-flex align-items-center gap-2">
+            <label class="form-label m-0"><strong>Titulo</strong></label>
+            <InputText class="form-control" @bind-Value="tarea.Titulo" placeholder="Ingresa el titulo"></InputText>
+        </div>
+        <ValidationMessage For="() => tarea.Titulo" />
+    </div>
+
+    <div class="mb-2">
+        <div class="d-flex align-items-center gap-2">
+            <label class="form-label m-0"><strong>Fecha</strong></label>
+            <InputDate class="form-control" @bind-Value="tarea.Fecha"></InputDate>
+        </div>
+        <ValidationMessage For="() => tarea.Fecha" />
+    </div>  
+
+    <div class="mb-2">
+        <label class="form-label"><strong>Descripcion</strong></label>
+        <InputTextArea class="form-control" @bind-Value="tarea.Descripcion" placeholder="Ingresa la descripcion"></InputTextArea>
+        <ValidationMessage For="() => tarea.Descripcion" />
+    </div>
+    
+    <div class="d-flex justify-content-center mt-4">
+        <div class="d-flex gap-2">
+            <button type="submit" class="btn btn-dark">Guardar Tarea</button>
+            <button @onclick="CerrarModal" class="btn btn-danger">Cerrar</button>
+        </div>
+    </div>
+</EditForm>
+
+@code {
+    [Parameter] public EventCallback<bool> Finalizado { get; set; }
+    [Parameter] public EventCallback<bool> Cerrar { get; set; }
+    private RegistrarTareaDTO tarea = new RegistrarTareaDTO();
+
+
+    private async Task GuardarTarea()
+    {
+        if (tarea == null) return;
+        var respuesta = await TareaService.RegistrarTarea(tarea);
+        if (respuesta)
+        {
+            await Finalizado.InvokeAsync(true);
+        }
+    }
+    private async Task CerrarModal()
+    {
+        await Cerrar.InvokeAsync(true);
+    }
+}

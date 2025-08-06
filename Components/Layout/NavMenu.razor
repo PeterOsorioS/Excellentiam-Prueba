@@ -1,0 +1,20 @@
+﻿@using Excellentiam.Service.Interface
+@inject CustomAuthenticationStateProvider AuthStateProvider
+@inject IAutenticacionService AutenticacionService
+@inject NavigationManager NavigationManager
+
+<div 
+    class="d-flex sticky-top justify-content-end m-3 bg-white py-3" 
+    @onclick="CerrarSesion" style="z-index: 9">
+    <button type="button" class="btn btn-outline-dark">
+        Cerrar Sesion
+    </button>
+</div>
+@code{
+    private async Task CerrarSesion()
+    {
+        await AutenticacionService.LogoutAsync();
+        AuthStateProvider.NotifyUserLogout();
+        NavigationManager.NavigateTo("/", forceLoad: true);
+    }
+}
